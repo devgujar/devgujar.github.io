@@ -103,7 +103,7 @@
     const status = document.getElementById('formStatus');
 
     if (form) {
-      form.addEventListener('submit', async function (e) {
+      form.addEventListener('submit', function (e) {
         e.preventDefault();
         const name = form.name.value.trim();
         const email = form.email.value.trim();
@@ -121,33 +121,14 @@
           return;
         }
 
-        status.textContent = 'Sending message…';
-        status.className = 'form-status';
+        // Open user's email client with pre-filled message (no backend needed).
+        const subject = encodeURIComponent('Portfolio contact from ' + name);
+        const body = encodeURIComponent(message + '\n\n— ' + name + ' (' + email + ')');
+        window.location.href = 'mailto:devgujar@gmail.com?subject=' + subject + '&body=' + body;
 
-        try {
-          const response = await fetch('https://emailapi.devgujar.workers.dev/api/sendemail', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, message })
-          });
-          let resultText = '';
-          try {
-            resultText = await response.text();
-          } catch (parseErr) {
-            resultText = '';
-          }
-          if (response.ok) {
-            status.textContent = 'Message sent successfully!';
-            status.className = 'form-status success';
-            form.reset();
-          } else {
-            status.textContent = 'Failed to send message. ' + (resultText ? resultText : 'Please try again.');
-            status.className = 'form-status error';
-          }
-        } catch (err) {
-          status.textContent = 'An error occurred. Please try again.';
-          status.className = 'form-status error';
-        }
+        status.textContent = 'Opening your email client… thanks for reaching out!';
+        status.className = 'form-status success';
+        form.reset();
       });
     }
 
@@ -155,3 +136,4 @@
     onScroll();
   });
 })();
+
