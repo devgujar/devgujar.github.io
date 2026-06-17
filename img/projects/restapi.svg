@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">REST API</title>
+  <desc id="desc">Cloud-hosted REST API development icon</desc>
+  <defs>
+    <linearGradient id="ra-grad" x1="12" y1="20" x2="84" y2="76" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#5b8cff"/>
+    </linearGradient>
+    <linearGradient id="ra-cloud" x1="20" y1="24" x2="76" y2="52" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5b8cff"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <path d="M24 44c0-10 8-18 18-18 2.4 0 4.7.5 6.8 1.4C51.8 18.8 57 16 63 16c11 0 20 9 20 20 0 .8-.1 1.6-.2 2.4C89.2 40.8 92 45.7 92 51c0 9.4-7.6 17-17 17H29c-8.3 0-15-6.7-15-15 0-6.2 3.8-11.6 9.2-13.9C23.1 47.8 24 46 24 44Z" fill="url(#ra-cloud)" opacity=".95"/>
+  <rect x="18" y="58" width="60" height="22" rx="8" fill="#111a2e" stroke="url(#ra-grad)" stroke-width="2.5"/>
+  <text x="48" y="73" text-anchor="middle" fill="#22d3ee" font-family="JetBrains Mono, monospace" font-size="11" font-weight="700">REST</text>
+  <path d="M30 88h36" stroke="url(#ra-grad)" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="30" cy="88" r="4" fill="#22d3ee"/>
+  <circle cx="48" cy="88" r="4" fill="#5b8cff"/>
+  <circle cx="66" cy="88" r="4" fill="#8b5cf6"/>
+  <path d="M34 34h10M52 34h10" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".75"/>
+  <path d="M40 28v12M58 28v12" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".75"/>
+</svg>
