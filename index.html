@@ -532,6 +532,304 @@
 
   <script src="js/app.js"></script>
 
+  <!-- ============================================================= -->
+  <!-- AI CHATBOT WIDGET (Groq powered)                              -->
+  <!-- ============================================================= -->
+  <style>
+    #chat-fab {
+      position: fixed; bottom: 150px; right: 100px; z-index: 9999;
+      width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      color: #0b1220; font-size: 26px; box-shadow: var(--shadow);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .15s ease; overflow: hidden; padding: 0;
+    }
+    #chat-fab:hover { transform: scale(1.08); }
+    #chat-fab img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+    #chat-panel {
+      position: fixed; bottom: 92px; right: 24px; z-index: 9999;
+      width: 370px; max-width: calc(100vw - 32px); height: 520px; max-height: calc(100vh - 130px);
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); display: none; flex-direction: column; overflow: hidden;
+    }
+    #chat-panel.open { display: flex; }
+
+    .chat-head {
+      padding: 14px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .chat-head .avatar {
+      width: 32px; height: 32px; border-radius: 50%; flex: 0 0 32px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #0b1220; overflow: hidden;
+    }
+    .chat-head .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .chat-head h4 { margin: 0; font-size: .98rem; color: var(--text); }
+    .chat-head small { color: var(--muted); font-size: .76rem; }
+    .chat-head .x { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; }
+
+    #chat-msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { max-width: 85%; padding: 10px 13px; border-radius: 12px; font-size: .9rem; line-height: 1.5; white-space: pre-wrap; word-wrap: break-word; }
+    .msg.bot  { align-self: flex-start; background: var(--surface-2); border: 1px solid var(--border); border-bottom-left-radius: 4px; color: var(--text); }
+    .msg.user { align-self: flex-end; background: rgba(91,140,255,.16); border: 1px solid var(--primary); border-bottom-right-radius: 4px; color: var(--text); }
+    .typing { color: var(--muted); font-style: italic; }
+
+    .chat-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--border); background: var(--surface); }
+    .chat-input textarea {
+      flex: 1; resize: none; height: 42px; max-height: 120px; padding: 10px 12px; font-family: inherit;
+      font-size: .9rem; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    }
+    .chat-input textarea:focus { outline: none; border-color: var(--primary); }
+    .chat-input button {
+      flex: 0 0 42px; width: 42px; border: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 18px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-2)); color: #0b1220;
+    }
+    .chat-input button:disabled { opacity: .5; cursor: default; }
+    .chat-key-row { padding: 8px 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .chat-key-row a { font-size: .76rem; color: var(--muted); cursor: pointer; }
+  </style>
+
+  <button id="chat-fab" title="Ask about Devanand" aria-label="Open chat">
+    <img src="img/chatbot.png" alt="Chat assistant"
+         onerror="this.replaceWith(document.createTextNode('\uD83D\uDCAC'))" />
+  </button>
+
+  <div id="chat-panel" role="dialog" aria-label="Portfolio assistant">
+    <div class="chat-head">
+      <div class="avatar">
+        <img src="img/chatbot.png" alt="Bot"
+             onerror="this.replaceWith(document.createTextNode('DG'))" />
+      </div>
+      <div>
+        <h4>Portfolio AI Assistant</h4>
+        <small>Ask about my experience &amp; projects</small>
+      </div>
+      <button class="x" id="chat-close" aria-label="Close">&times;</button>
+    </div>
+    <div id="chat-msgs"></div>
+    <div class="chat-input">
+      <textarea id="chat-text" placeholder="e.g. What is your experience with AI?" rows="1"></textarea>
+      <button id="chat-send" aria-label="Send">➤</button>
+    </div>
+    <div class="chat-key-row">
+      <a id="chat-reset-key">🔑 Set / change Groq API key</a>
+    </div>
+  </div>
+
+  <!-- Runtime config.
+       On GitHub Pages there is no /api/chat proxy, so the widget will fall back
+       to asking each visitor for a Groq key (stored only in their browser).
+       To make it key-free for visitors, deploy a Cloudflare Worker proxy and set:
+         window.GROQ_PROXY_URL = "https://your-proxy.workers.dev/api/chat"; -->
+  <script>
+    window.GROQ_API_KEY   = "__GROQ_API_KEY__";   // optional override (leave as-is to use the proxy)
+    window.GROQ_PROXY_URL = "__GROQ_PROXY_URL__"; // optional override (leave as-is to use /api/chat)
+  </script>
+  <script>
+  (function () {
+    // ---- Config ----------------------------------------------------------
+    const GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions";
+    const GROQ_MODEL = "llama-3.3-70b-versatile";
+    const KEY_STORE  = "groq_api_key";
+
+    const clean = (v) => (typeof v === "string" && v && !/^__.*__$/.test(v)) ? v : "";
+    let   PROXY_URL    = clean(window.GROQ_PROXY_URL);
+    const INJECTED_KEY = clean(window.GROQ_API_KEY);
+
+    let proxyIsAuto = false;
+    if (!PROXY_URL && !INJECTED_KEY && location.protocol.indexOf("http") === 0) {
+      PROXY_URL = "/api/chat";
+      proxyIsAuto = true;
+    }
+
+    // Knowledge the model uses to answer (keeps it on-topic & accurate).
+    const SYSTEM_PROMPT = `You are a friendly assistant for the personal portfolio website of Devanand Gujar.
+Answer ONLY questions about Devanand, his experience, skills, projects, education, certifications, achievements,
+and how to contact him. If asked something unrelated, politely steer back. Keep answers concise, use plain text
+(short paragraphs / bullets), and speak about Devanand in the third person.
+
+KEY FACTS ABOUT DEVANAND GUJAR:
+- Role: SQA Lead / Manager (Automation) — Award-winning QA Automation & AI-Driven Quality Engineering leader with 14+ years of experience.
+- Location: Near EON IT Park, Kharadi, Pune — 411014, India.
+- Current employer: Wolters Kluwer Financial Services (Report Builder — Finance, Risk & Regulatory Reporting), Jul 2017 – Present.
+- Focus: Championing GitHub Copilot, Generative AI and Agentic AI adoption to accelerate delivery, code quality and team performance.
+- Microsoft Certified — GitHub Copilot (GH-300). Also ISTQB Advanced Test Analyst, ISTQB Foundation, Certified Ethical Hacker (CEH), HP LoadRunner.
+- Currently leads a cross-functional team of 4–5 engineers (Dev & QA); technical mentor; believes in shift-left testing, code reviews and fast feedback loops.
+- Experiments with LLMs: Claude Opus, GPT-5x, GPT-5x Codex, Gemini-3x.
+
+TECHNICAL SKILLS:
+- AI & Productivity: GitHub Copilot, Generative AI, Agentic AI, Prompt Engineering, AI-assisted QA, Claude Opus, GPT-5x Codex, GPT-5x, Gemini-3x.
+- Test Automation: Selenium, Core Java, TestNG, Playwright, JUnit, Excel Macro, VSTS-2010 (VB), Batch/Shell.
+- Development: Java 11/17, ExtJS, Hibernate, REST APIs, IntelliJ IDEA.
+- CI/CD & DevSecOps: Jenkins, TeamCity, Bitbucket, Git, Maven, SonarQube, Black Duck.
+- Databases: Oracle 18XE/19c, SQL Server 2018, MySQL.
+- Test & Defect Mgmt: JIRA, Bugzilla, Test-Link, Siebel, TFS, ApTest Manager.
+
+EXPERIENCE (most recent first):
+- Wolters Kluwer India (Jul 2017 – Present) — SQA Lead/Manager. Core Java, ExtJS, Hibernate, Oracle, SQL Server. Owns CI/CD & automation strategy (TeamCity), built Playwright POC, led Log4j remediation, Apache POI 3.10→3.17 upgrade, Tomcat→JBoss migration, DevSecOps with SonarQube & Black Duck.
+- Citibank Technology Center (Jan 2015 – Apr 2017) — Asst. Manager / Sr. Test Analyst. .NET, Java, SQL Server, JavaScript. Automated regression using in-house Selenium-Java framework.
+- PubMatic (Oct 2013 – Jan 2015) — Sr. QA Engineer. RHEL 6, CentOS, PHP, JavaScript, MySQL. Java + Selenium/JUnit automation.
+- PTC Software (Dec 2011 – Oct 2013) — QA Analyst on Windchill (PLM). Java, SQL, Oracle 11. Selenium scripting and RCA.
+- Cybage Software (Sep 2009 – Sep 2011) — QA Engineer (client: Symantec). C#, .NET 3.5, SQL Server. Security & performance testing, VSTS 2010.
+
+EDUCATION:
+- Executive MBA (I.T.), Symbiosis (SCMHRD), Pune — Dec 2015.
+- PG Diploma in Advanced Computing (C-DAC), Sunbeam, Pune — Aug 2009.
+- B.E. Information Technology, Govt. College of Engineering, Amravati — Mar 2008.
+
+ACHIEVEMENTS: 9+ workplace awards including Star Performance Award (Wolters Kluwer 2020), Thank You Award, E-Thank You Award (Citibank), multiple Spot Awards & Innovation & Impact Team Award (PubMatic), Team of the Month & Excellence Award (PTC), Best Project Award (C-DAC 2009).
+
+LIVE PROJECTS:
+- "One Framework — UI + API Automation": a scalable modular framework pairing Selenium UI automation with REST Assured API automation, orchestrated by TestNG with a shared common module. Live: https://oneframework.devgujar.workers.dev/
+- "REST API Development": a hands-on REST API on Cloudflare Workers exploring cloud-native API design, routing, middleware and serverless deployment. Live: https://restapi.devgujar.workers.dev/
+
+CONTACT:
+- Email: devgujar@gmail.com | Phone: +91 9096-3121-88
+- LinkedIn: https://www.linkedin.com/in/devgujar/
+- The site has a contact form and a downloadable résumé.
+
+RESUME & LINKS:
+- Résumé document: Resume_DevanandGujar_Eng.docx (available for download from this site).
+- Source repository (this portfolio site): https://github.com/devgujar/devgujar.github.io
+- LinkedIn profile: https://www.linkedin.com/in/devgujar/`;
+
+    // ---- Elements --------------------------------------------------------
+    const fab    = document.getElementById("chat-fab");
+    const panel  = document.getElementById("chat-panel");
+    const closeB = document.getElementById("chat-close");
+    const msgs   = document.getElementById("chat-msgs");
+    const text   = document.getElementById("chat-text");
+    const sendB  = document.getElementById("chat-send");
+    const resetK = document.getElementById("chat-reset-key");
+
+    const history = [{ role: "system", content: SYSTEM_PROMPT }];
+    let greeted = false;
+
+    // ---- Helpers ---------------------------------------------------------
+    function addMsg(role, content) {
+      const el = document.createElement("div");
+      el.className = "msg " + (role === "user" ? "user" : "bot");
+      el.textContent = content;
+      msgs.appendChild(el);
+      msgs.scrollTop = msgs.scrollHeight;
+      return el;
+    }
+
+    function getKey() {
+      if (INJECTED_KEY) return INJECTED_KEY;
+      let k = localStorage.getItem(KEY_STORE);
+      if (!k) {
+        k = window.prompt("Enter your Groq API key (stored only in this browser).\nGet a free key at https://console.groq.com/keys");
+        if (k) localStorage.setItem(KEY_STORE, k.trim());
+      }
+      return k ? k.trim() : null;
+    }
+
+    async function ask(question) {
+      history.push({ role: "user", content: question });
+      const typing = addMsg("bot", "Thinking…");
+      typing.classList.add("typing");
+      sendB.disabled = true;
+
+      let url, headers, body, key = null;
+      if (PROXY_URL) {
+        url = PROXY_URL;
+        headers = { "Content-Type": "application/json" };
+        body = JSON.stringify({ messages: history, model: GROQ_MODEL });
+      } else {
+        key = getKey();
+        if (!key) {
+          typing.classList.remove("typing");
+          typing.textContent = "A Groq API key is required to chat. Click the 🔑 link below to add one.";
+          sendB.disabled = false;
+          history.pop();
+          return;
+        }
+        url = GROQ_URL;
+        headers = { "Content-Type": "application/json", "Authorization": "Bearer " + key };
+        body = JSON.stringify({ model: GROQ_MODEL, messages: history, temperature: 0.3, max_tokens: 700 });
+      }
+
+      try {
+        const res = await fetch(url, { method: "POST", headers, body });
+
+        if (!res.ok) {
+          const errTxt = await res.text();
+          typing.classList.remove("typing");
+          if (res.status === 404 && proxyIsAuto) {
+            PROXY_URL = "";
+            proxyIsAuto = false;
+            const row = resetK.closest(".chat-key-row");
+            if (row) row.style.display = "";
+            typing.textContent = "No server proxy found. Set a Groq key via the 🔑 link below, then resend your message.";
+            history.pop();
+          } else if (res.status === 401 && !PROXY_URL && !INJECTED_KEY) {
+            localStorage.removeItem(KEY_STORE);
+            typing.textContent = "Invalid API key. Click the 🔑 link below to set a valid Groq key.";
+          } else {
+            typing.textContent = "Error " + res.status + ": " + errTxt.slice(0, 200);
+          }
+          return;
+        }
+
+        const data = await res.json();
+        const reply = data.choices?.[0]?.message?.content?.trim() || "Sorry, I couldn't generate a response.";
+        history.push({ role: "assistant", content: reply });
+        typing.classList.remove("typing");
+        typing.textContent = reply;
+      } catch (e) {
+        typing.classList.remove("typing");
+        typing.textContent = "Network error: " + e.message;
+      } finally {
+        sendB.disabled = false;
+        msgs.scrollTop = msgs.scrollHeight;
+      }
+    }
+
+    function send() {
+      const q = text.value.trim();
+      if (!q) return;
+      addMsg("user", q);
+      text.value = "";
+      text.style.height = "42px";
+      ask(q);
+    }
+
+    // ---- Events ----------------------------------------------------------
+    fab.addEventListener("click", () => {
+      panel.classList.toggle("open");
+      if (panel.classList.contains("open")) {
+        if (!greeted) {
+          addMsg("bot", "👋 Hi! I'm Devanand's portfolio assistant. Ask me about his experience, skills, live projects, certifications, or how to get in touch.");
+          greeted = true;
+        }
+        text.focus();
+      }
+    });
+    closeB.addEventListener("click", () => panel.classList.remove("open"));
+    sendB.addEventListener("click", send);
+    text.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    });
+    text.addEventListener("input", () => {
+      text.style.height = "42px";
+      text.style.height = Math.min(text.scrollHeight, 120) + "px";
+    });
+    resetK.addEventListener("click", () => {
+      localStorage.removeItem(KEY_STORE);
+      const k = getKey();
+      addMsg("bot", k ? "✅ API key saved. Go ahead and ask your question!" : "No key set.");
+    });
+
+    if (PROXY_URL || INJECTED_KEY) {
+      const row = resetK.closest(".chat-key-row");
+      if (row) row.style.display = "none";
+    }
+  })();
+  </script>
+
 </body>
 
 </html>
