@@ -103,6 +103,8 @@
     const status = document.getElementById('formStatus');
 
     if (form) {
+      const submitBtn = form.querySelector('[type="submit"]');
+
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         const name = form.name.value.trim();
@@ -121,14 +123,35 @@
           return;
         }
 
-        // Open user's email client with pre-filled message (no backend needed).
-        const subject = encodeURIComponent('Portfolio contact from ' + name);
-        const body = encodeURIComponent(message + '\n\n— ' + name + ' (' + email + ')');
-        window.location.href = 'mailto:devgujar@gmail.com?subject=' + subject + '&body=' + body;
+        const originalBtnText = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Sending…';
+        }
+        status.textContent = 'Sending your message…';
+        status.className = 'form-status';
 
-        status.textContent = 'Opening your email client… thanks for reaching out!';
-        status.className = 'form-status success';
-        form.reset();
+        fetch('https://emailapi.devgujar.workers.dev/api/sendemail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, email: email, message: message })
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('Request failed with status ' + res.status);
+            status.textContent = 'Thanks for reaching out! Your message has been sent.';
+            status.className = 'form-status success';
+            form.reset();
+          })
+          .catch(function () {
+            status.textContent = 'Sorry, something went wrong. Please try again later.';
+            status.className = 'form-status error';
+          })
+          .finally(function () {
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+            }
+          });
       });
     }
 
