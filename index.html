@@ -842,6 +842,18 @@ RESUME & LINKS:
       const row = resetK.closest(".chat-key-row");
       if (row) row.style.display = "none";
     }
+
+    // ---- Auto-open the assistant on page load ----------------------------
+    function openPanel() {
+      panel.classList.add("open");
+      if (!greeted) {
+        addMsg("bot", "👋 Hi! I'm Devanand's portfolio assistant. Ask me about his experience, skills, live projects, certifications, or how to get in touch.");
+        greeted = true;
+      }
+    }
+    window.addEventListener("load", function () {
+      setTimeout(openPanel, 3000);
+    });
   })();
   </script>
 

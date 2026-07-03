@@ -155,6 +155,14 @@
       });
     }
 
+    /* ---------- Default to About section on load ---------- */
+    if (!window.location.hash) {
+      const aboutSection = document.getElementById('about');
+      if (aboutSection) {
+        window.scrollTo({ top: aboutSection.offsetTop, behavior: 'auto' });
+      }
+    }
+
     // Initial paint
     onScroll();
   });
